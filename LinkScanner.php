@@ -8,6 +8,7 @@ class LinkScanner
 	private $links = [];
 	private $outboundLinks = [];
 	private $brokenLinks = [];
+	private $checkedBrokenOutbound = [];
 	public $debug = false;
 	public $timeout = 5;
 	
@@ -18,9 +19,7 @@ class LinkScanner
 	
 	public function scan ($includeOutbound = false)
 	{
-		$this->links = [];
-		$this->outboundLinks = [];
-		$this->brokenLinks = [];
+		$this->init ();
 		
 		$this->loadLinks (NULL, $includeOutbound);
 		
@@ -29,9 +28,7 @@ class LinkScanner
 	
 	public function findBrokenLinks ()
 	{
-		$this->links = [];
-		$this->outboundLinks = [];
-		$this->brokenLinks = [];
+		$this->init ();
 		
 		$this->loadLinks (NULL, false, true);
 		
@@ -90,8 +87,19 @@ class LinkScanner
 		return $this->links;
 	}
 	
+	private function init ()
+	{
+		$this->links = [];
+		$this->outboundLinks = [];
+		$this->brokenLinks = [];
+		$this->checkedBrokenOutbound = [];
+	}
+	
 	private function checkBroken ($url)
 	{
+		if (in_array ($url, $this->checkedBrokenOutbound))
+			return false;
+		
 		$this->log ('Checking if link is broken: ' . $url);
 		
 		$curl = new Curl ($url);
@@ -108,6 +116,7 @@ class LinkScanner
 		$broken = $curlResult->http_code != 200;
 		if ($broken)
 			$this->addBrokenLink ($url);
+		$this->checkedBrokenOutbound[] = $url;
 		
 		return $broken;
 	}

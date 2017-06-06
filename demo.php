@@ -3,6 +3,7 @@
 require_once ('LinkScanner.php');
 
 $scanner = new LinkScanner ('https://robinj.be/');
+$scanner->debug = true;
 $links = $scanner->scan (true);
 $broken = $scanner->findBrokenLinks ();
 
