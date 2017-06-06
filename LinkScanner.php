@@ -7,6 +7,7 @@ class LinkScanner
 	private $base;
 	private $links = [];
 	private $outboundLinks = [];
+	private $brokenLinks = [];
 	private $debug = false;
 	
 	public function __construct ($base)
@@ -18,13 +19,25 @@ class LinkScanner
 	{
 		$this->links = [];
 		$this->outboundLinks = [];
+		$this->brokenLinks = [];
 		
 		$this->loadLinks (NULL, $includeOutbound);
 		
 		return array_merge ($this->links, $this->outboundLinks);
 	}
 	
-	private function loadLinks ($url = NULL, $collectOutbound = false)
+	public function findBrokenLinks ()
+	{
+		$this->links = [];
+		$this->outboundLinks = [];
+		$this->brokenLinks = [];
+		
+		$this->loadLinks (NULL, false, true);
+		
+		return $this->brokenLinks;
+	}
+	
+	private function loadLinks ($url = NULL, $collectOutbound = false, $findBroken = false)
 	{
 		if ($url === NULL)
 			$url = $this->base;
@@ -34,12 +47,16 @@ class LinkScanner
 		$this->log ('Loading: ' . $url);
 		$curl = new Curl ($url);
 		$curl->followlocation = true;
+		$curl->useragent = 'PHP LinkScanner';
 		$curlResult = $curl->exec ();
+		
+		if ($findBroken && $curlResult->http_code != 200)
+			$this->addBrokenLink ($url);
 		
 		if ($curlResult->content_type === NULL || ! $this->startsWith ($curlResult->content_type, 'text/html'))
 			return [];
 		
-		libxml_use_internal_errors (true); // LibXML doesn't like HTML5 tags //
+		libxml_use_internal_errors (true); // It doesn't like HTML5 tags //
 		
 		$doc = new DOMDocument ();
 		$doc->loadHTML ($curlResult->content);
@@ -63,9 +80,32 @@ class LinkScanner
 			$outbound = ! $this->startsWith ($href, $this->base);
 			if ($collectOutbound || ! $outbound)
 				$this->addLink ($href, $outbound) && $this->loadLinks ($href, $collectOutbound);
+			else if ($outbound && $findBroken)
+				$this->checkBroken ($href);
 		}
 		
 		return $this->links;
+	}
+	
+	private function checkBroken ($url)
+	{
+		$this->log ('Checking if link is broken: ' . $url);
+		
+		$curl = new Curl ($url);
+		$curl->followlocation = true;
+		$curl->header = true;
+		$curl->nobody = true;
+		$curl->timeout = 5;
+		$curl->useragent = 'PHP LinkScanner';
+		$curlResult = $curl->exec ();
+		
+		$this->log ('Link ' . $url . ' returned HTTP status ' . $curlResult->http_code);
+		
+		$broken = $curlResult->http_code != 200;
+		if ($broken)
+			$this->addBrokenLink ($url);
+		
+		return $broken;
 	}
 	
 	private function addLink ($link, $outbound = false)
@@ -80,6 +120,17 @@ class LinkScanner
 			$this->links[] = $link;
 		
 		return ! $outbound;
+	}
+	
+	private function addBrokenLink ($link)
+	{
+		if (in_array ($link, $this->brokenLinks))
+			return false;
+		
+		$this->log ('Adding broken link: ' . $link);
+		$this->brokenLinks[] = $link;
+		
+		return true;
 	}
 	
 	private function startsWith ($haystack, $needles)
