@@ -8,7 +8,8 @@ class LinkScanner
 	private $links = [];
 	private $outboundLinks = [];
 	private $brokenLinks = [];
-	private $debug = false;
+	public $debug = false;
+	public $timeout = 5;
 	
 	public function __construct ($base)
 	{
@@ -47,6 +48,8 @@ class LinkScanner
 		$this->log ('Loading: ' . $url);
 		$curl = new Curl ($url);
 		$curl->followlocation = true;
+		$curl->timeout = $this->timeout;
+		$curl->connecttimeout = $this->timeout;
 		$curl->useragent = 'PHP LinkScanner';
 		$curlResult = $curl->exec ();
 		
@@ -95,7 +98,8 @@ class LinkScanner
 		$curl->followlocation = true;
 		$curl->header = true;
 		$curl->nobody = true;
-		$curl->timeout = 5;
+		$curl->timeout = $this->timeout;
+		$curl->connecttimeout = $this->timeout;
 		$curl->useragent = 'PHP LinkScanner';
 		$curlResult = $curl->exec ();
 		
