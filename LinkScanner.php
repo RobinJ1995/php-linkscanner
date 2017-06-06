@@ -17,26 +17,29 @@ class LinkScanner
 		$this->base = $this->trailingSlash ($base);
 	}
 	
-	public function scan ($includeOutbound = false)
+	public function scan ($includeOutbound = false, $maxDepth = NULL)
 	{
 		$this->init ();
 		
-		$this->loadLinks (NULL, $includeOutbound);
+		$this->loadLinks (NULL, $includeOutbound, NULL, $maxDepth);
 		
 		return array_merge ($this->links, $this->outboundLinks);
 	}
 	
-	public function findBrokenLinks ()
+	public function findBrokenLinks ($maxDepth = NULL)
 	{
 		$this->init ();
 		
-		$this->loadLinks (NULL, false, true);
+		$this->loadLinks (NULL, false, true, $maxDepth);
 		
 		return $this->brokenLinks;
 	}
 	
-	private function loadLinks ($url = NULL, $collectOutbound = false, $findBroken = false)
+	private function loadLinks ($url = NULL, $collectOutbound = false, $findBroken = false, $maxDepth = NULL, $depth = 1)
 	{
+		if ($maxDepth !== NULL && $depth > $maxDepth)
+			return $this->links;
+		
 		if ($url === NULL)
 			$url = $this->base;
 		
@@ -79,8 +82,8 @@ class LinkScanner
 			
 			$outbound = ! $this->startsWith ($href, $this->base);
 			if ($collectOutbound || ! $outbound)
-				$this->addLink ($href, $outbound) && $this->loadLinks ($href, $collectOutbound);
-			else if ($outbound && $findBroken)
+				$this->addLink ($href, $outbound) && $this->loadLinks ($href, $collectOutbound, $findBroken, $maxDepth, $depth + 1);
+			else if ($outbound && $findBroken && ($maxDepth === NULL || $depth <= $maxDepth))
 				$this->checkBroken ($href);
 		}
 		
