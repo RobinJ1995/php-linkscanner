@@ -45,13 +45,26 @@ class LinkScanner
 		
 		$this->addLink ($url);
 		
-		$this->log ('Loading: ' . $url);
+		$this->log ('Loading: ' . $url, $depth);
 		$curl = new Curl ($url);
 		$curl->followlocation = true;
 		$curl->timeout = $this->timeout;
 		$curl->connecttimeout = $this->timeout;
 		$curl->useragent = 'PHP LinkScanner';
-		$curlResult = $curl->exec ();
+		
+		try
+		{
+			$curlResult = $curl->exec ();
+		}
+		catch (CurlException $ex)
+		{
+			if ($findBroken && $ex->code != 28) // Curl error code 28 == Timeout //
+				$this->addBrokenLink ($url);
+			
+			$this->log ('Loading ' . $url . ' failed: ' . $ex->getMessage ());
+			
+			return $this->links;
+		}
 		
 		if ($findBroken && $curlResult->http_code != 200)
 			$this->addBrokenLink ($url);
@@ -61,7 +74,7 @@ class LinkScanner
 		
 		libxml_use_internal_errors (true); // It doesn't like HTML5 tags //
 		
-		$doc = new DOMDocument ();
+		$doc = new \DOMDocument ();
 		$doc->loadHTML ($curlResult->content);
 		$linkElements = $doc->getElementsByTagName ('a');
 		$this->log ('Links found: ' . $linkElements->length);
@@ -80,7 +93,7 @@ class LinkScanner
 			else
 				continue;
 			
-			$outbound = ! $this->startsWith ($href, $this->base);
+			$outbound = ! $this->startsWith ($href, $this->httphttps ($this->base));
 			if ($collectOutbound || ! $outbound)
 				$this->addLink ($href, $outbound) && $this->loadLinks ($href, $collectOutbound, $findBroken, $maxDepth, $depth + 1);
 			else if ($outbound && $findBroken && ($maxDepth === NULL || $depth <= $maxDepth))
@@ -112,7 +125,25 @@ class LinkScanner
 		$curl->timeout = $this->timeout;
 		$curl->connecttimeout = $this->timeout;
 		$curl->useragent = 'PHP LinkScanner';
-		$curlResult = $curl->exec ();
+		
+		try
+		{
+			$curlResult = $curl->exec ();
+		}
+		catch (CurlException $ex)
+		{
+			$this->log ('Loading ' . $url . ' failed: ' . $ex->getMessage ());
+			
+			if ($ex->code != 28) // Curl error code 28 == Timeout //
+			{
+				$this->addBrokenLink ($url);
+				$this->checkedBrokenOutbound[] = $url;
+				
+				return $true;
+			}
+			
+			return false;
+		}
 		
 		$this->log ('Link ' . $url . ' returned HTTP status ' . $curlResult->http_code);
 		
@@ -191,9 +222,17 @@ class LinkScanner
 		return $str;
 	}
 	
-	private function log ($message)
+	private function httphttps ($url)
+	{
+		if ($this->startsWith ($url, 'http://'))
+			return [ $url, substr_replace ($url, 's', 4, 0) ];
+		else
+			return [ substr_replace ($url, '', 4, 1), $url ];
+	}
+	
+	private function log ($message, $tag = NULL)
 	{
 		if ($this->debug)
-			echo '[LinkScanner] ' . $message . PHP_EOL;
+			echo '[LinkScanner' . (empty ($tag) ? '' : ':' . $tag) . '] ' . $message . PHP_EOL;
 	}
 }

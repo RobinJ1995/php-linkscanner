@@ -66,9 +66,7 @@ class Curl
 		$errno = curl_errno ($this->curl);
 		$error = curl_error ($this->curl);
 		
-		$message = '[' . $errno . '] ' . $error;
-		
-		return new \Exception ($message);
+		return new CurlException ($errno, $error);
 	}
 	
 	public static function version ()
@@ -137,6 +135,20 @@ class CurlVersion
 			return $this->data[$snake];
 		
 		return NULL;
+	}
+}
+
+class CurlException extends \Exception
+{
+	public $code;
+	public $error;
+	
+	public function __construct ($code, $error)
+	{
+		$this->code = $code;
+		$this->error = $error;
+		
+		parent::__construct ('[' . $code . '] ' . $error);
 	}
 }
 ?>
