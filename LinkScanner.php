@@ -51,25 +51,14 @@ class LinkScanner
 			$href = $this->urlStripHashtag ($linkElement->getAttribute ('href'));
 			$this->log ('Processing link: ' . $href);
 			
-			if (empty ($href))
-			{
+			if (empty ($href) || $this->startsWith ($href, ['tel:', 'mailto:']))
 				continue;
-			}
 			else if ($this->startsWith ($href, ['http://', 'https://']))
-			{
-			}
-			else if ($this->startsWith ($href, ['tel:', 'mailto:']))
-			{
-				continue;
-			}
+				{}
 			else if ($this->startsWith ($href, '/') || ctype_alnum ($href[0]))
-			{
 				$href = $this->base . ltrim ($href, '/');
-			}
 			else
-			{
 				continue;
-			}
 			
 			$outbound = ! $this->startsWith ($href, $this->base);
 			if ($collectOutbound || ! $outbound)
