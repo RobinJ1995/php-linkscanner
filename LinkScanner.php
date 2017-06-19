@@ -139,7 +139,7 @@ class LinkScanner
 				$this->addBrokenLink ($url);
 				$this->checkedBrokenOutbound[] = $url;
 				
-				return $true;
+				return true;
 			}
 			
 			return false;
